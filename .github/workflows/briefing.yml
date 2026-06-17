@@ -10,30 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
+      - run: pip install playwright && playwright install chromium
+      - run: python briefing.py
 
-      - name: Install deps
+      - id: png
         run: |
-          pip install playwright
-          playwright install chromium
-
-      - name: Generate
-        run: python briefing.py
-
-      - name: Find PNG
-        id: png
-        run: |
-          PNG=$(ls -t ~/briefings/*.png 2>/dev/null | head -1)
+          PNG=$(ls -t ~/briefings/*.png | head -1)
           echo "path=$PNG" >> $GITHUB_OUTPUT
-          echo "Found: $PNG"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: briefing
           path: ~/briefings/*.png
@@ -43,21 +32,7 @@ jobs:
         if: steps.png.outputs.path != ''
         env:
           WEBHOOK: ${{ secrets.WECHAT_WEBHOOK_URL }}
-        shell: bash
-        run: |
-          set +e
-          PNG="${{ steps.png.outputs.path }}"
-          TITLE="Hermes AI 速报 $(date '+%Y-%m-%d %H:%M')"
-          [ -z "$WEBHOOK" ] && { echo "No webhook"; exit 0; }
-          echo "Uploading..."
-          UP=$(curl -s --max-time 30 -X POST "https://sctapi.ftqq.com/upload" -F "file=@$PNG" 2>&1)
-          IMG=$(echo "$UP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('data',{}).get('url','')or'')" 2>/dev/null)
-          if [ -n "$IMG" ]; then
-            MSG="![Hermes AI 速报]($IMG)"
-          else
-            MSG="本期速报已生成，查看 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          fi
-          curl -s --max-time 15 -X POST "$WEBHOOK" -H "Content-Type: application/json" \
-            -d "{\"title\":\"$TITLE\",\"desp\":\"$MSG\"}"
-          echo ""
-          echo "Done"
+          TITLE: "Hermes AI 速报 $(date '+%Y-%m-%d %H:%M')"
+          RUN_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ART_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"
+        run: python send.py
