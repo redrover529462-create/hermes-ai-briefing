@@ -2,8 +2,8 @@ name: Hermes AI 速报
 
 on:
   schedule:
-    - cron: '0 */4 * * *'   # 每 4 小时运行一次
-  workflow_dispatch:          # 允许手动触发
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
 
 jobs:
   generate:
@@ -17,34 +17,56 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
           pip install playwright
           playwright install chromium
-          sudo apt-get install -y fonts-noto-color-emoji 2>/dev/null || true
 
-      - name: Generate briefing
+      - name: Generate
         run: python briefing.py
 
-      - name: Upload PNG artifact
+      - name: Find PNG
+        id: png
+        run: |
+          PNG=$(ls -t ~/briefings/*.png 2>/dev/null | head -1)
+          echo "path=$PNG" >> $GITHUB_OUTPUT
+          echo "Found: $PNG"
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: briefing
           path: ~/briefings/*.png
           retention-days: 7
 
-      - name: Send to WeChat (via webhook)
-        if: env.BRIEFING_PNG != ''
+      - name: Send to WeChat
+        if: steps.png.outputs.path != ''
         env:
-          WECHAT_WEBHOOK: ${{ secrets.WECHAT_WEBHOOK_URL }}
+          WEBHOOK: ${{ secrets.WECHAT_WEBHOOK_URL }}
         run: |
-          if [ -n "$WECHAT_WEBHOOK" ]; then
-            BRIEFING_DATE="${{ env.BRIEFING_DATE }}"
-            IMG_PATH="${{ env.BRIEFING_PNG }}"
-            echo "Would send: $IMG_PATH (date: $BRIEFING_DATE)"
-            echo "Webhook configured: YES"
-            # TODO: upload image and send via webhook
-          else
-            echo "No WECHAT_WEBHOOK_URL configured. Set it in GitHub repo Secrets."
-            echo "Format: your Server酱/PushPlus/企业微信 webhook URL"
+          PNG="${{ steps.png.outputs.path }}"
+          TITLE="Hermes AI 速报 $(date '+%Y-%m-%d %H:%M')"
+
+          if [ -z "$WEBHOOK" ]; then
+            echo "No webhook configured. Skipping WeChat send."
+            exit 0
           fi
+
+          # 上传图片到 Server酱
+          echo "Uploading image..."
+          UP=$(curl -s -X POST "https://sctapi.ftqq.com/upload" -F "file=@$PNG")
+          IMG=$(echo "$UP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('url',''))" 2>/dev/null)
+
+          if [ -n "$IMG" ]; then
+            echo "Image URL: $IMG"
+            MSG="![Hermes AI 速报]($IMG)"
+          else
+            echo "Image upload failed. Sending text only."
+            MSG="本期速报已生成，请查看 GitHub Actions Artifacts"
+          fi
+
+          curl -s -X POST "$WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"$TITLE\",\"desp\":\"$MSG\"}"
+          
+          echo "" && echo "Done!"
