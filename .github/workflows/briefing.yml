@@ -32,7 +32,6 @@ jobs:
         if: steps.png.outputs.path != ''
         env:
           WEBHOOK: ${{ secrets.WECHAT_WEBHOOK_URL }}
-          TITLE: "Hermes AI 速报 $(date '+%Y-%m-%d %H:%M')"
-          RUN_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          ART_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ART_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
         run: python send.py

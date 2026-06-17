@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""发送速报到 Server酱"""
+"""Send to Server酱 WeChat"""
 import os, json, urllib.request, sys
 
-webhook = os.environ.get('WEBHOOK')
+# 列出所有环境变量（调试用）
+print("WEBHOOK present:", 'WEBHOOK' in os.environ)
+
+webhook = os.environ.get('WEBHOOK', '')
 if not webhook:
-    print("No WEBHOOK env var, skipping")
+    print("No WEBHOOK, skip")
     sys.exit(0)
 
-title = os.environ.get('TITLE', 'Hermes AI 速报')
+print(f"Webhook starts with: {webhook[:20]}...")
+
+title = "Hermes AI 速报"
 run_url = os.environ.get('RUN_URL', '')
 art_url = os.environ.get('ART_URL', '')
 
@@ -17,7 +22,7 @@ msg = f"""## 🤖 Hermes AI 速报
 
 [📥 查看速报截图(Artifact)]({art_url})
 
-[🔗 查看 GitHub Actions 运行日志]({run_url})
+[🔗 查看运行日志]({run_url})
 
 ---
 *信源：大黑AI速报 + Hacker News*
@@ -25,5 +30,9 @@ msg = f"""## 🤖 Hermes AI 速报
 
 data = json.dumps({'title': title, 'desp': msg}).encode('utf-8')
 req = urllib.request.Request(webhook, data=data, headers={'Content-Type': 'application/json'})
-resp = urllib.request.urlopen(req, timeout=15)
-print(f"Sent! Status: {resp.status}")
+try:
+    resp = urllib.request.urlopen(req, timeout=15)
+    print(f"Sent! HTTP {resp.status}")
+except Exception as e:
+    print(f"Error: {e}")
+    sys.exit(0)
