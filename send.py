@@ -2,15 +2,14 @@
 """Send to Server酱 WeChat"""
 import os, json, urllib.request, sys
 
-# 列出所有环境变量（调试用）
-print("WEBHOOK present:", 'WEBHOOK' in os.environ)
-
 webhook = os.environ.get('WEBHOOK', '')
 if not webhook:
     print("No WEBHOOK, skip")
     sys.exit(0)
 
-print(f"Webhook starts with: {webhook[:20]}...")
+# 如果只是 SendKey，补全 URL
+if not webhook.startswith('http'):
+    webhook = f"https://sctapi.ftqq.com/{webhook}.send"
 
 title = "Hermes AI 速报"
 run_url = os.environ.get('RUN_URL', '')
@@ -35,4 +34,4 @@ try:
     print(f"Sent! HTTP {resp.status}")
 except Exception as e:
     print(f"Error: {e}")
-    sys.exit(0)
+    sys.exit(1)
